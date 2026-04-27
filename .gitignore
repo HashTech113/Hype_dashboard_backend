@@ -1,0 +1,47 @@
+# ---------- Python ----------
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ---------- Secrets ----------
+.env
+.env.local
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- Storage ----------
+# Never commit. Contains real face images / event snapshots /
+# unknown captures — all PII.
+storage/
+
+# ---------- Backups ----------
+*.dump
+*.bak
+*.zip
+*.tar.gz
+*.7z
+
+# ---------- Editor / tool cruft ----------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---------- Local-only test scripts ----------
+_module*_smoke.py
+_*_smoke.py
+
+# ---------- Frontend (also see frontend/.gitignore) ----------
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+.vercel
