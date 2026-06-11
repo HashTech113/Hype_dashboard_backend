@@ -81,8 +81,8 @@ export default function AttendancePage() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        title="Attendance logs"
-        description="Every IN, OUT, and break event across all cameras. Add manual events, correct mistakes, or recompute a day's rollup."
+        title="Activity log"
+        description="Every entry and exit event captured across all cameras. Add events manually, correct mistakes, or recompute a day's roll-up."
         actions={
           <>
             <Button

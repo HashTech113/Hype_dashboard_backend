@@ -256,44 +256,121 @@ class DailyAttendanceService:
         employee_id: int | None,
         start: date,
         end: date,
+        chunk_commit_every: int = 200,
     ) -> int:
         """Force-recompute the daily rollup for every (employee, date) in the range.
 
-        If `employee_id` is None, recomputes every employee who had at least one
-        event in the range. Returns the number of (employee, date) combinations
-        touched.
+        H6 fix — was previously N×M queries inside one transaction. For a
+        quarter range × 100 employees that was 30,000+ round-trips holding
+        locks the entire time, which drained the pool and stalled camera
+        attendance INSERTs.
+
+        Now:
+          - ONE query loads every event in the range (server-side ordered).
+          - Pure-Python bucketing by (employee_id, local_date).
+          - Per-day _compute() is the same pure function as recompute().
+          - Upserts happen in chunks, committing every N rows so locks do
+            not span the whole job.
+
+        If `employee_id` is None, recomputes every employee who had at least
+        one event in the range. Returns the number of (employee, date)
+        combinations touched.
         """
         if end < start:
             start, end = end, start
 
-        from sqlalchemy import distinct, select
+        from sqlalchemy import asc, select
 
         from app.models.attendance_event import AttendanceEvent
+        from app.utils.time_utils import local_date_of
 
         range_start, _ = local_day_bounds(start)
         _, range_end = local_day_bounds(end)
 
-        if employee_id is not None:
-            employees = [employee_id]
-        else:
-            stmt = select(distinct(AttendanceEvent.employee_id)).where(
+        stmt = (
+            select(AttendanceEvent)
+            .where(
                 AttendanceEvent.event_time >= range_start,
                 AttendanceEvent.event_time < range_end,
             )
-            employees = [int(r) for r in self.db.execute(stmt).scalars().all()]
+            .order_by(
+                asc(AttendanceEvent.employee_id),
+                asc(AttendanceEvent.event_time),
+            )
+        )
+        if employee_id is not None:
+            stmt = stmt.where(AttendanceEvent.employee_id == employee_id)
 
-        touched = 0
-        cur = start
+        all_events = list(self.db.execute(stmt).scalars().all())
+
+        # Bucket events into (employee_id, local_date) -> ordered events.
+        buckets: dict[tuple[int, date], list[AttendanceEvent]] = {}
+        seen_employees: set[int] = set()
+        for ev in all_events:
+            key = (ev.employee_id, local_date_of(ev.event_time))
+            buckets.setdefault(key, []).append(ev)
+            seen_employees.add(ev.employee_id)
+
+        # Build the full date range so absent days also get an ABSENT rollup.
         dates: list[date] = []
+        cur = start
         while cur <= end:
             dates.append(cur)
             cur += timedelta(days=1)
 
+        if employee_id is not None:
+            employees = [employee_id]
+        else:
+            employees = sorted(seen_employees)
+
+        touched = 0
+        chunked_since_commit = 0
         for emp_id in employees:
             for d in dates:
-                self.recompute(emp_id, d)
+                events = buckets.get((emp_id, d), [])
+                self._apply_rollup(emp_id, d, events)
                 touched += 1
+                chunked_since_commit += 1
+                if chunked_since_commit >= chunk_commit_every:
+                    self.db.flush()
+                    self.db.commit()
+                    chunked_since_commit = 0
+
+        self.db.flush()
+        # Caller's session_scope will commit; an explicit commit here would
+        # double-flush some sessions. Last chunk lands at scope exit.
+        log.info(
+            "recompute_range employees=%d dates=%d touched=%d",
+            len(employees),
+            len(dates),
+            touched,
+        )
         return touched
+
+    def _apply_rollup(
+        self, employee_id: int, work_date: date, events: list
+    ) -> None:
+        """Compute + upsert one (employee, date). No DB read for events —
+        the caller supplies them pre-loaded. Used by recompute_range."""
+        computed = self._compute(events, work_date)
+        if computed.out_time is not None and computed.in_time is not None:
+            status = SessionStatus.PRESENT
+        elif computed.in_time is not None:
+            status = SessionStatus.INCOMPLETE
+        else:
+            status = SessionStatus.ABSENT
+        row = self.daily_repo.upsert_for_day(employee_id, work_date)
+        row.in_time = computed.in_time
+        row.break_out_time = computed.first_break_out
+        row.break_in_time = computed.first_break_in
+        row.out_time = computed.out_time
+        row.total_work_seconds = computed.total_work_seconds
+        row.total_break_seconds = computed.total_break_seconds
+        row.break_count = computed.break_count
+        row.late_minutes = computed.late_minutes
+        row.early_exit_minutes = computed.early_exit_minutes
+        row.status = status
+        row.is_manually_adjusted = computed.any_manual
 
     def reopen_day(self, work_date: date) -> int:
         """Clear the is_day_closed flag for all employees on this date.

@@ -73,24 +73,44 @@ class AttendanceService:
                 False, f"invalid_transition_from_{current}_via_{camera_type.value}", None
             )
 
-        snapshot_path = self.snapshot_service.save_event_snapshot(
-            employee_id=employee_id,
-            event_type=next_type,
-            frame_bgr=frame_bgr,
-            bbox=bbox,
-            captured_at=at,
-        )
-
+        # H3 fix: write the event row FIRST with snapshot_path=None so a
+        # disk hiccup (full disk, AV lock, NTFS quirk) on the snapshot write
+        # cannot drop a real IN/OUT attendance event. Then attempt the
+        # snapshot — if it succeeds, update the row; if it fails, the event
+        # is preserved without a photo (which is acceptable degraded state).
         event = AttendanceEvent(
             employee_id=employee_id,
             camera_id=camera_id,
             event_type=next_type,
             event_time=at,
             confidence=confidence,
-            snapshot_path=snapshot_path,
+            snapshot_path=None,
             is_manual=False,
         )
         self.event_repo.add(event)
+        self.db.flush()  # assigns event.id and persists the row
+
+        try:
+            snapshot_path = self.snapshot_service.save_event_snapshot(
+                employee_id=employee_id,
+                event_type=next_type,
+                frame_bgr=frame_bgr,
+                bbox=bbox,
+                captured_at=at,
+            )
+            event.snapshot_path = snapshot_path
+        except Exception as exc:
+            # Don't lose the attendance event over a snapshot failure.
+            # The row already exists; just log and continue with no photo.
+            log.warning(
+                "Snapshot write failed for event id=%s emp=%s type=%s: %s — "
+                "event recorded without photo",
+                getattr(event, "id", "?"),
+                employee_id,
+                next_type.value,
+                exc,
+            )
+
         self.daily_service.recompute(employee_id, local_date_of(at))
         log.info(
             "Auto event employee_id=%s code=%s type=%s camera_id=%s conf=%.3f",

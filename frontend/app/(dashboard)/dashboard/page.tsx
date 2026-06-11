@@ -19,7 +19,8 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Overview</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Live snapshot of attendance, presence, and recent events.
+            Live snapshot of people on camera, recent entries and exits, and
+            unknown faces — across all cameras.
           </p>
         </div>
         <LiveIndicator

@@ -14,6 +14,7 @@ import type {
   CameraCreate,
   CameraProbeRequest,
   CameraUpdate,
+  SmartConnectRequest,
 } from "@/lib/types/camera";
 
 export const cameraKeys = {
@@ -55,9 +56,16 @@ export function useCreateCamera() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: CameraCreate) => camerasApi.create(payload),
-    onSuccess: () => {
+    onSuccess: (cam) => {
       qc.invalidateQueries({ queryKey: cameraKeys.all });
-      toast.success("Camera added");
+      // H9: row saved successfully; if the worker also started, just
+      // confirm. If a worker_warning came back, surface it so the operator
+      // knows the camera is dark and can act.
+      if (cam?.worker_warning) {
+        toast.warning(`Camera added — ${cam.worker_warning}`);
+      } else {
+        toast.success("Camera added");
+      }
     },
     onError: (err) => toastError(err, "Could not add camera"),
   });
@@ -68,9 +76,13 @@ export function useUpdateCamera() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: CameraUpdate }) =>
       camerasApi.update(id, payload),
-    onSuccess: () => {
+    onSuccess: (cam) => {
       qc.invalidateQueries({ queryKey: cameraKeys.all });
-      toast.success("Camera updated");
+      if (cam?.worker_warning) {
+        toast.warning(`Camera updated — ${cam.worker_warning}`);
+      } else {
+        toast.success("Camera updated");
+      }
     },
     onError: (err) => toastError(err, "Could not update camera"),
   });
@@ -108,6 +120,33 @@ export function useProbeCamera() {
 }
 
 /**
+ * Run the Smart Connect probe ladder WITHOUT creating a camera — used by
+ * the wizard to give live feedback on whether the credentials work.
+ */
+export function useSmartProbe() {
+  return useMutation({
+    mutationFn: (payload: SmartConnectRequest) => camerasApi.smartProbe(payload),
+    onError: (err) => toastError(err, "Smart probe failed"),
+  });
+}
+
+/**
+ * Run the Smart Connect probe AND persist the camera if it succeeded.
+ * Used by the wizard's final step.
+ */
+export function useConnectSmart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SmartConnectRequest) => camerasApi.connectSmart(payload),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: cameraKeys.all });
+      if (result.camera) toast.success(`Camera "${result.camera.name}" added`);
+    },
+    onError: (err) => toastError(err, "Could not connect camera"),
+  });
+}
+
+/**
  * Polls a camera's annotated preview JPEG and exposes a stable object
  * URL the consumer can drop into <img src=...>. Revokes the previous
  * URL whenever a fresh frame lands so the browser's blob memory is bounded.
@@ -118,9 +157,13 @@ export function useProbeCamera() {
  * - On error, the last good frame is kept on screen and `error` is set;
  *   polling continues so the view recovers automatically.
  */
+// Default 200ms (5 frames/sec) — paired with backend CAMERA_FPS=15
+// this gives a perceptibly real-time feed (camera reads every 67ms,
+// frontend polls a fresh JPEG every 200ms). Drop to 150ms for an even
+// snappier feel; CPU cost scales linearly per visible camera tile.
 export function useCameraPreview(
   cameraId: number | null,
-  intervalMs: number = 600,
+  intervalMs: number = 200,
 ) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

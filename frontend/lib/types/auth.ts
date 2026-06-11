@@ -7,6 +7,7 @@ export interface Admin {
   role: Role;
   is_active: boolean;
   last_login_at: string | null;
+  password_changed_at: string | null;
 }
 
 export interface LoginRequest {
@@ -23,4 +24,19 @@ export interface TokenResponse {
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
+}
+
+export interface AdminCreate {
+  username: string;
+  full_name?: string | null;
+  role: Role;
+  initial_password: string;
+  is_active?: boolean;
+}
+
+export interface AdminUpdate {
+  full_name?: string | null;
+  role?: Role;
+  is_active?: boolean;
+  reset_password?: string;
 }

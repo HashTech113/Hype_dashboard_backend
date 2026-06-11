@@ -1,0 +1,100 @@
+# Caddy reverse-proxy config for AI CCTV Attendance (P0.8).
+#
+# Terminates TLS in front of:
+#   - The Next.js frontend (127.0.0.1:3000)
+#   - The FastAPI backend (127.0.0.1:8000) under /api/* and /health*
+#
+# Caddy auto-generates a self-signed certificate at startup, which works
+# for LAN use. For a public domain, replace the placeholder `attendance.local`
+# with your real domain — Caddy will fetch a Let's Encrypt cert automatically
+# (the machine must be reachable on ports 80 + 443 from the internet for ACME).
+#
+# Install Caddy on Windows:
+#   1. Download caddy_windows_amd64.zip from https://caddyserver.com/download
+#   2. Extract caddy.exe to C:\caddy\
+#   3. Copy THIS file to C:\caddy\Caddyfile
+#   4. Run as a Windows Service (one-time):
+#        sc.exe create Caddy binPath= "C:\caddy\caddy.exe run --config C:\caddy\Caddyfile" start= auto
+#        sc.exe start Caddy
+#      OR with NSSM (recommended — auto-restart on crash):
+#        nssm install Caddy "C:\caddy\caddy.exe" run --config C:\caddy\Caddyfile
+#        nssm set Caddy Start SERVICE_AUTO_START
+#        nssm set Caddy AppDirectory C:\caddy
+#        nssm start Caddy
+#
+# Local hosts entry (for `attendance.local`):
+#   Add to C:\Windows\System32\drivers\etc\hosts:
+#     192.168.1.50  attendance.local
+#
+# Browser trust warning:
+#   On first visit the browser will warn about the self-signed cert.
+#   For an office LAN deployment, click "Advanced" -> "Proceed to attendance.local".
+#   For zero-warning operation, either deploy with a real domain + Let's
+#   Encrypt, or install Caddy's self-signed root CA on each admin workstation.
+
+attendance.local {
+    # Auto-generate a self-signed cert. Replace with explicit `tls /path/to/cert /path/to/key`
+    # or remove this line entirely to let Caddy pick automatically.
+    tls internal
+
+    # Force HTTPS — any HTTP request gets a 308 to HTTPS (Caddy default).
+
+    # ---- HSTS ----
+    # 1 year max-age, applies to subdomains. Removes for the public domain
+    # case where you might host other sites.
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # ---- Common security headers ----
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+    header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # ---- API routes -> FastAPI backend ----
+    @api {
+        path /api/* /health /health/* /openapi.json /docs /docs/* /redoc /redoc/*
+    }
+    handle @api {
+        # Carry real client IP through to the backend so the lockout audit log
+        # is accurate. FastAPI reads X-Forwarded-For (see _client_ip helper).
+        reverse_proxy 127.0.0.1:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+            # Long upload timeout for face-training image uploads (multi-MB).
+            transport http {
+                read_timeout 120s
+                write_timeout 120s
+            }
+        }
+    }
+
+    # ---- Everything else -> Next.js frontend ----
+    handle {
+        reverse_proxy 127.0.0.1:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
+    # ---- Logging ----
+    log {
+        output file C:\caddy\access.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+        format json
+        level INFO
+    }
+}
+
+# Block direct HTTP on port 80 from the LAN — Caddy will redirect to 443
+# automatically when the site block above defines a name. This explicit
+# block is for the case where the machine has another local address that
+# might respond on HTTP.
+:80 {
+    redir https://attendance.local{uri} permanent
+}

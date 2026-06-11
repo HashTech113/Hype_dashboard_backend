@@ -62,9 +62,36 @@ function buildClient(): AxiosInstance {
   instance.interceptors.response.use(
     (r: AxiosResponse) => r,
     (error: AxiosError) => {
+      // P0.12 — on auth-required 401, fully boot the user back to /login:
+      //   1. Clear the auth cookie so the next request has no token
+      //   2. Clear ALL cached data in TanStack Query (otherwise the
+      //      dashboard would keep showing the previous admin's PII)
+      //   3. Hard-redirect to /login — softer navigation can leave
+      //      stale UI state on screen during the route change
       if (error.response?.status === 401) {
         const authRequired = (error.config as { __auth?: boolean } | undefined)?.__auth !== false;
-        if (authRequired) clearToken();
+        if (authRequired && typeof window !== "undefined") {
+          clearToken();
+          // Lazy-load to avoid a hard module dependency at build time.
+          import("@/lib/query-client")
+            .then(({ getQueryClient }) => {
+              try {
+                getQueryClient().clear();
+              } catch {
+                /* best-effort */
+              }
+            })
+            .catch(() => {
+              /* best-effort */
+            });
+          // Avoid redirect loop if we're already at /login.
+          if (!window.location.pathname.startsWith("/login")) {
+            const next = encodeURIComponent(
+              window.location.pathname + window.location.search,
+            );
+            window.location.assign(`/login?next=${next}`);
+          }
+        }
       }
       return Promise.reject(toApiError(error));
     },

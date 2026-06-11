@@ -28,10 +28,25 @@ const schema = z.object({
 
 type LoginValues = z.infer<typeof schema>;
 
+// Only allow same-origin relative paths to prevent open-redirect attacks.
+// Rejects absolute URLs (http://, https://), protocol-relative URLs (//evil.com),
+// and any value that does not start with a single "/".
+function isValidRedirect(path: string): boolean {
+  return (
+    typeof path === "string" &&
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !path.startsWith("/\\")
+  );
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const rawNext = searchParams.get("next");
-  const nextPath = !rawNext || rawNext === "/" ? "/dashboard" : rawNext;
+  const nextPath =
+    !rawNext || rawNext === "/" || !isValidRedirect(rawNext)
+      ? "/dashboard"
+      : rawNext;
   const { login } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -50,9 +65,7 @@ export function LoginForm() {
       toast.success("Welcome back");
       // Hard navigation: ensures the freshly-set token cookie is on the
       // request, the middleware sees it, and AuthProvider remounts with
-      // the cookie present (skipping any React state-timing races between
-      // setAdmin() and router.replace() that can cause the dashboard layout
-      // to bounce back to /login).
+      // the cookie present (skipping any React state-timing races).
       window.location.assign(nextPath);
     } catch (err) {
       const msg =

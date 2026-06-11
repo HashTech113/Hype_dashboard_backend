@@ -17,8 +17,8 @@ export function Sidebar() {
           <ScanFace className="h-4 w-4" />
         </div>
         <div className="leading-tight">
-          <p className="text-sm font-semibold">AI Attendance</p>
-          <p className="text-[11px] text-muted-foreground">CCTV · Admin Panel</p>
+          <p className="text-sm font-semibold">AI Surveillance</p>
+          <p className="text-[11px] text-muted-foreground">People Tracking · Admin Panel</p>
         </div>
       </div>
 

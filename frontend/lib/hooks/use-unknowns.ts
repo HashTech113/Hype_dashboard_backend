@@ -21,6 +21,9 @@ export const unknownKeys = {
     ["unknowns", "list", params] as const,
   detail: (id: number) => ["unknowns", "detail", id] as const,
   capture: (id: number) => ["unknowns", "capture", id] as const,
+  // Shared blob cache (H12) — same captureId across multiple components
+  // resolves to the same ObjectURL fetched once.
+  captureBlob: (id: number) => ["unknowns", "capture-blob", id] as const,
 };
 
 function toastError(err: unknown, fallback: string) {
@@ -51,46 +54,38 @@ export function useUnknownCluster(id: number | null) {
 /**
  * Fetches a face capture image as an authenticated blob and exposes it as a
  * stable object URL for <img>. Mirrors `useSnapshotUrl` from attendance.
+ *
+ * H12 fix: now uses useQuery so the same captureId is fetched once and
+ * shared across every card on the grid + the detail dialog. Previously a
+ * page of 24 cards issued 24 independent auth fetches, queued at Chrome's
+ * 6-per-origin cap, and re-fetched everything on every re-render.
+ *
+ * The ObjectURL is created INSIDE queryFn and stored in the cache, so all
+ * consumers get the same URL string (cheap, stable). When the query is
+ * garbage-collected after gcTime, we revoke the URL via the queryCache
+ * listener installed in providers.tsx — see `installBlobRevocation`.
  */
 export function useUnknownCaptureUrl(captureId: number | null | undefined) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!captureId) {
-      setUrl(null);
-      setError(null);
-      return;
-    }
-    let active = true;
-    let objectUrl: string | null = null;
-    setLoading(true);
-    setError(null);
-
-    unknownsApi
-      .captureBlob(captureId)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load image");
-        setUrl(null);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [captureId]);
-
-  return { url, loading, error };
+  const q = useQuery({
+    queryKey: captureId
+      ? unknownKeys.captureBlob(captureId)
+      : ["unknowns", "capture-blob", "none"],
+    queryFn: async () => {
+      if (!captureId) return null;
+      const blob = await unknownsApi.captureBlob(captureId);
+      return URL.createObjectURL(blob);
+    },
+    enabled: !!captureId,
+    staleTime: 10 * 60_000, // 10 min — images don't change once written
+    gcTime: 15 * 60_000,
+  });
+  return {
+    url: (q.data as string | null) ?? null,
+    loading: q.isLoading,
+    error: q.error
+      ? (q.error instanceof Error ? q.error.message : "Failed to load image")
+      : null,
+  };
 }
 
 export function useSetClusterLabel() {

@@ -39,7 +39,10 @@ class PurgeResult:
 class SnapshotService:
     """Event-based snapshot persistence.
 
-    Layout: {SNAPSHOT_DIR}/YYYY-MM-DD/{employee_id}/{HHMMSS}_{EVENT}_{uuid}.jpg
+    Layout: {SNAPSHOT_DIR}/YYYY-MM-DD/HH/{employee_id}/{HHMMSS}_{EVENT}_{uuid}.jpg
+
+    The hour-level shard caps per-directory file counts (NTFS performance
+    degrades sharply above ~100k entries in a single directory).
     """
 
     def save_event_snapshot(
@@ -54,7 +57,8 @@ class SnapshotService:
         settings = get_settings()
         local_ts = to_local(captured_at)
         date_dir = local_ts.strftime("%Y-%m-%d")
-        dir_path = Path(settings.SNAPSHOT_DIR) / date_dir / str(employee_id)
+        hour_dir = local_ts.strftime("%H")
+        dir_path = Path(settings.SNAPSHOT_DIR) / date_dir / hour_dir / str(employee_id)
 
         image = crop_bbox(frame_bgr, bbox, pad=_CROP_PAD) if bbox is not None else frame_bgr
         if image.size == 0:

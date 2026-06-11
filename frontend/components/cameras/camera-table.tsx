@@ -9,6 +9,7 @@ import {
   Pencil,
   PowerOff,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -88,9 +89,9 @@ export function CameraTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[28%]">Name</TableHead>
+          <TableHead className="w-[24%]">Name</TableHead>
           <TableHead>RTSP</TableHead>
-          <TableHead>Type</TableHead>
+          <TableHead>FPS</TableHead>
           <TableHead>Health</TableHead>
           <TableHead className="w-[60px]" />
         </TableRow>
@@ -112,18 +113,14 @@ export function CameraTable({
               </TableCell>
               <TableCell>
                 <code
-                  className="block max-w-[420px] truncate font-mono text-xs text-muted-foreground"
+                  className="block max-w-[380px] truncate font-mono text-xs text-muted-foreground"
                   title={maskRtsp(cam.rtsp_url)}
                 >
                   {maskRtsp(cam.rtsp_url)}
                 </code>
               </TableCell>
               <TableCell>
-                <Badge
-                  variant={cam.camera_type === "ENTRY" ? "default" : "secondary"}
-                >
-                  {cam.camera_type}
-                </Badge>
+                <FpsCell camera={cam} health={h} />
               </TableCell>
               <TableCell>
                 <HealthCell camera={cam} health={h} />
@@ -155,7 +152,7 @@ export function CameraTable({
                       onClick={() => onDelete(cam)}
                       className="text-destructive focus:text-destructive"
                     >
-                      <PowerOff className="mr-2 h-4 w-4" /> Remove
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete forever
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -165,6 +162,35 @@ export function CameraTable({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+function FpsCell({
+  camera,
+  health,
+}: {
+  camera: Camera;
+  health: CameraHealth | undefined;
+}) {
+  // Show the effective FPS (what the worker is actually running at) and
+  // mark with "(override)" when set per-camera so it's obvious which
+  // cameras are tuned individually.
+  if (!camera.is_active) {
+    return <span className="text-xs text-muted-foreground">&mdash;</span>;
+  }
+  const eff = health?.fps_effective ?? camera.fps_override ?? null;
+  const isOverride = camera.fps_override !== null && camera.fps_override !== undefined;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-sm tabular-nums">
+        {eff !== null ? `${eff} fps` : <span className="text-muted-foreground">global</span>}
+      </span>
+      {isOverride && (
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          override
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -191,6 +217,24 @@ function HealthCell({
       </Badge>
     );
   }
+  // DEGRADED — too many consecutive open failures. Surface the count + the
+  // last error so the operator knows what's wrong without opening logs.
+  if (health.health_state === "DEGRADED") {
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge variant="destructive" className="gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Degraded
+        </Badge>
+        <span
+          className="max-w-[260px] truncate text-[11px] text-destructive"
+          title={health.last_error ?? undefined}
+        >
+          {health.last_error ?? `${health.consecutive_open_failures} open failures`}
+        </span>
+      </div>
+    );
+  }
   if (health.last_error) {
     return (
       <div className="flex flex-col gap-1">
@@ -204,6 +248,11 @@ function HealthCell({
         >
           {health.last_error}
         </span>
+        {health.total_reconnects > 0 && (
+          <span className="text-[10px] text-muted-foreground">
+            {health.total_reconnects} reconnect{health.total_reconnects === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
     );
   }

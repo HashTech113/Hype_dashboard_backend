@@ -18,3 +18,8 @@ openpyxl==3.1.5
 python-dotenv==1.0.1
 tzdata==2024.2
 scikit-learn>=1.3,<2
+# ONVIF discovery for the SmartRTSP "ask the camera for its own stream URL"
+# path. Soft-imported by app/services/smart_rtsp_service.py — the system
+# still runs if this package is missing (we fall back to brand-pattern
+# probing), but install it for the best detection success rate.
+onvif-zeep==0.2.12

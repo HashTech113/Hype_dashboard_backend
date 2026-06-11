@@ -2,6 +2,12 @@ from app.models.admin import Admin
 from app.models.attendance_event import AttendanceEvent
 from app.models.attendance_settings import AttendanceSettings
 from app.models.camera import Camera
+from app.models.compliance import (
+    AdminAuditLog,
+    BiometricPurgeLog,
+    ConsentRecord,
+    ConsentScope,
+)
 from app.models.daily_attendance import DailyAttendance
 from app.models.employee import Employee
 from app.models.face_embedding import EmployeeFaceEmbedding
@@ -10,9 +16,13 @@ from app.models.unknown_face import UnknownFaceCapture, UnknownFaceCluster
 
 __all__ = [
     "Admin",
+    "AdminAuditLog",
     "AttendanceEvent",
     "AttendanceSettings",
+    "BiometricPurgeLog",
     "Camera",
+    "ConsentRecord",
+    "ConsentScope",
     "DailyAttendance",
     "Employee",
     "EmployeeFaceEmbedding",

@@ -31,7 +31,7 @@ export default function LoginPage() {
         </div>
         <CardTitle className="text-2xl">Sign in</CardTitle>
         <CardDescription>
-          AI CCTV Attendance &mdash; admin access only
+          AI Camera Surveillance &mdash; admin access only
         </CardDescription>
       </CardHeader>
       <CardContent>

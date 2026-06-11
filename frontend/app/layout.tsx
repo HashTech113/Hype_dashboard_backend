@@ -5,8 +5,8 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Attendance",
-  description: "AI CCTV-based office attendance dashboard",
+  title: "AI Camera Surveillance",
+  description: "AI-powered camera surveillance with face recognition, entry/exit tracking, and unknown-face capture",
 };
 
 export const viewport: Viewport = {

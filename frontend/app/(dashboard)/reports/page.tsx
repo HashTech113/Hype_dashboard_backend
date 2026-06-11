@@ -11,7 +11,7 @@ export default function ReportsPage() {
     <div className="mx-auto flex max-w-[1200px] flex-col gap-6">
       <PageHeader
         title="Reports"
-        description="Export attendance data as Excel workbooks. All exports respect the selected timezone and include manual-correction flags."
+        description="Export activity data as Excel workbooks. All exports respect the selected timezone and include manual-correction flags."
       />
 
       <div className="grid gap-4 md:grid-cols-2">

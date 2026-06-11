@@ -1,11 +1,13 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Radar, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { CameraFormDialog } from "@/components/cameras/camera-form-dialog";
 import { CameraTable } from "@/components/cameras/camera-table";
+import { CameraWizardDialog } from "@/components/cameras/camera-wizard-dialog";
 import { DeleteCameraDialog } from "@/components/cameras/delete-camera-dialog";
+import { DetectCamerasDialog } from "@/components/cameras/detect-cameras-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,9 @@ export default function CamerasPage() {
   const { data: health } = useCamerasHealth(5_000);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [detectOpen, setDetectOpen] = useState(false);
+  const [prefillIp, setPrefillIp] = useState<string | null>(null);
   const [editing, setEditing] = useState<Camera | null>(null);
   const [deleting, setDeleting] = useState<Camera | null>(null);
 
@@ -42,17 +47,32 @@ export default function CamerasPage() {
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
         title="Cameras"
-        description="Register the office's RTSP cameras (CP Plus / Dahua / Hikvision compatible). The system spawns one worker per camera at 1 FPS."
+        description="Connect your IP cameras (Hikvision, Dahua, CP Plus, Axis, Reolink, and most ONVIF brands). Each camera streams live, detects faces, and logs every entry and exit."
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Add camera
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDetectOpen(true)}
+              title="Scan the network for cameras"
+            >
+              <Radar className="h-4 w-4" />
+              Detect on LAN
+            </Button>
+            <Button onClick={() => setWizardOpen(true)}>
+              <Sparkles className="h-4 w-4" />
+              Smart Connect
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add manually
+            </Button>
+          </div>
         }
       />
 
@@ -97,6 +117,22 @@ export default function CamerasPage() {
           if (!v) setEditing(null);
         }}
         camera={editing}
+      />
+      <CameraWizardDialog
+        open={wizardOpen}
+        onOpenChange={(v) => {
+          setWizardOpen(v);
+          if (!v) setPrefillIp(null);
+        }}
+        prefillHost={prefillIp ?? undefined}
+      />
+      <DetectCamerasDialog
+        open={detectOpen}
+        onOpenChange={setDetectOpen}
+        onConnectClick={(cam) => {
+          setPrefillIp(cam.ip);
+          setWizardOpen(true);
+        }}
       />
       <DeleteCameraDialog
         open={deleting !== null}

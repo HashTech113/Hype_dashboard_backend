@@ -6,7 +6,7 @@ from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.core.constants import Role
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.db.session import get_sessionmaker
 from app.models.admin import Admin
 from app.services.auth_service import AuthService
@@ -59,6 +59,7 @@ def get_camera_manager(request: Request) -> CameraManager:
 
 
 def get_current_admin(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Admin:
@@ -67,7 +68,20 @@ def get_current_admin(
     token = authorization.split(" ", 1)[1].strip()
     if not token:
         raise AuthenticationError("Empty token")
-    return AuthService(db).resolve_admin(token)
+    admin = AuthService(db).resolve_admin(token)
+    # Force-rotate gate: if the admin must change password (e.g. the
+    # bootstrap super-admin on first login), block every endpoint except
+    # the password-change endpoint itself and the /auth/me identity probe
+    # the frontend uses to render the change-password screen.
+    if admin.must_change_password:
+        path = request.url.path or ""
+        allowed_suffixes = ("/auth/change-password", "/auth/me")
+        if not any(path.endswith(suffix) for suffix in allowed_suffixes):
+            raise AuthorizationError(
+                "Password change required before using the system",
+                code="password_change_required",
+            )
+    return admin
 
 
 def require_roles(*roles: Role):

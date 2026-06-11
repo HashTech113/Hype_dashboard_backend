@@ -31,3 +31,21 @@ class AdminRead(ORMModel):
     role: Role
     is_active: bool
     last_login_at: datetime | None
+    password_changed_at: datetime | None = None
+
+
+class AdminCreate(BaseModel):
+    """SUPER_ADMIN only — create a new admin / VIEWER / ADMIN."""
+    username: str = Field(min_length=3, max_length=64)
+    full_name: str | None = Field(default=None, max_length=128)
+    role: Role
+    initial_password: str = Field(min_length=8, max_length=256)
+    is_active: bool = True
+
+
+class AdminUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=128)
+    role: Role | None = None
+    is_active: bool | None = None
+    # SUPER_ADMIN can set a new password for an admin who forgot theirs.
+    reset_password: str | None = Field(default=None, min_length=8, max_length=256)

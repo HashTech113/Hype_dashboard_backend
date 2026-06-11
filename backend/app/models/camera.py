@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Enum as SAEnum, String, Text
+from sqlalchemy import Boolean, Enum as SAEnum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.constants import CameraType
@@ -19,3 +19,7 @@ class Camera(Base, TimestampMixin):
     location: Mapped[str | None] = mapped_column(String(256), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    # Per-camera FPS override. NULL means "use global CAMERA_FPS setting".
+    # 0 < fps <= 30. Useful when one camera covers a busy entrance (needs
+    # higher FPS) and another a low-traffic back door (lower FPS = lower CPU).
+    fps_override: Mapped[int | None] = mapped_column(Integer, nullable=True)

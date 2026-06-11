@@ -65,8 +65,8 @@ export default function EmployeesPage() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        title="Employees"
-        description="Manage staff records, roles, and training eligibility."
+        title="Registered people"
+        description="Manage the people the cameras are trained to recognize. Add new entries, update details, or remove."
         actions={
           <Button
             onClick={() => {

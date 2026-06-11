@@ -63,8 +63,8 @@ export default function SnapshotsPage() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        title="Snapshots"
-        description="Every event capture, organized by date or employee. Click a card to zoom in, download, or navigate with arrow keys."
+        title="Event photos"
+        description="Every face capture from every camera, organized by date or person. Click a card to zoom in, download, or navigate with arrow keys."
       />
 
       <Card className="p-4">

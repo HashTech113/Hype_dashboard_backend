@@ -60,6 +60,14 @@ const schema = z.object({
   location: z.string().trim().max(256).optional().or(z.literal("")),
   description: z.string().trim().max(1024).optional().or(z.literal("")),
   is_active: z.boolean(),
+  // "" means inherit the global FPS; numeric overrides 1..30.
+  fps_override: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (/^\d+$/.test(v) && +v >= 1 && +v <= 30),
+      "FPS must be between 1 and 30 (or blank to inherit the global setting)",
+    ),
 });
 
 type Values = z.infer<typeof schema>;
@@ -95,6 +103,7 @@ export function CameraFormDialog({
       location: "",
       description: "",
       is_active: true,
+      fps_override: "",
     },
   });
 
@@ -109,6 +118,7 @@ export function CameraFormDialog({
           location: camera.location ?? "",
           description: camera.description ?? "",
           is_active: camera.is_active,
+          fps_override: camera.fps_override ? String(camera.fps_override) : "",
         });
       } else {
         form.reset({
@@ -118,6 +128,7 @@ export function CameraFormDialog({
           location: "",
           description: "",
           is_active: true,
+          fps_override: "",
         });
       }
     }
@@ -143,6 +154,7 @@ export function CameraFormDialog({
   }
 
   function handleSubmit(values: Values) {
+    const fps = values.fps_override?.trim();
     const payload = {
       name: values.name.trim(),
       rtsp_url: values.rtsp_url.trim(),
@@ -150,6 +162,7 @@ export function CameraFormDialog({
       location: toUndef(values.location) ?? null,
       description: toUndef(values.description) ?? null,
       is_active: values.is_active,
+      fps_override: fps ? +fps : null,
     };
     if (isEdit && camera) {
       update.mutate(
@@ -162,6 +175,12 @@ export function CameraFormDialog({
       });
     }
   }
+
+  // Heuristic — warn if the URL has an unencoded `@` in the password segment.
+  // The backend auto-fixes this, but a heads-up here saves operator confusion.
+  const url = form.watch("rtsp_url") ?? "";
+  const atCount = (url.match(/@/g) || []).length;
+  const showAtWarning = atCount > 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,32 +199,14 @@ export function CameraFormDialog({
           className="space-y-4"
           noValidate
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4">
             <Field label="Name" required error={errors.name?.message}>
               <Input
-                placeholder="Main Entry"
+                placeholder="Office cam 1, Front door, Reception …"
                 autoFocus
                 {...form.register("name")}
                 disabled={submitting}
               />
-            </Field>
-            <Field label="Type" required error={errors.camera_type?.message}>
-              <Select
-                value={form.watch("camera_type")}
-                onValueChange={(v) =>
-                  form.setValue("camera_type", v as CameraType, {
-                    shouldDirty: true,
-                  })
-                }
-              >
-                <SelectTrigger disabled={submitting}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ENTRY">ENTRY (incoming)</SelectItem>
-                  <SelectItem value="EXIT">EXIT (outgoing)</SelectItem>
-                </SelectContent>
-              </Select>
             </Field>
           </div>
 
@@ -235,6 +236,12 @@ export function CameraFormDialog({
                 Test
               </Button>
             </div>
+            {showAtWarning && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Heads up — your URL has more than one <code className="text-xs">@</code>.
+                We&apos;ll automatically percent-encode the <code className="text-xs">@</code> in your password to <code className="text-xs">%40</code> on save.
+              </p>
+            )}
           </Field>
 
           {probeResult && (
@@ -270,13 +277,30 @@ export function CameraFormDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Location">
               <Input
                 placeholder="Front door, ground floor"
                 {...form.register("location")}
                 disabled={submitting}
               />
+            </Field>
+            <Field
+              label="FPS override"
+              error={errors.fps_override?.message as string | undefined}
+            >
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={30}
+                placeholder="(use global)"
+                {...form.register("fps_override")}
+                disabled={submitting}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                1&ndash;30 fps. Blank = inherit global setting. Lower for low-traffic doors.
+              </p>
             </Field>
             <Field label="Status">
               <label className="mt-2 flex items-center gap-2 text-sm">
@@ -286,7 +310,7 @@ export function CameraFormDialog({
                   {...form.register("is_active")}
                   disabled={submitting}
                 />
-                Active (worker will start when saved)
+                Active
               </label>
             </Field>
           </div>

@@ -187,7 +187,7 @@ class TrainingService:
             if self.image_repo.get_by_hash(employee_id, file_hash) is not None:
                 errors.append("duplicate frame (same hash already enrolled)")
             else:
-                self._persist_face(
+                captured_vec = self._persist_face(
                     employee=employee,
                     frame_bgr=frame_bgr,
                     admin_id=admin_id,
@@ -208,7 +208,13 @@ class TrainingService:
 
         self.db.flush()
         total = self.embedding_repo.count_by_employee(employee.id)
-        self.cache.load_from_db()
+        # H4 fix: incremental append, no full DB reload
+        self.cache.append_vectors(
+            employee_id=employee.id,
+            employee_code=employee.employee_code,
+            employee_name=employee.name,
+            new_vectors=[captured_vec],
+        )
         log.info(
             "Live-captured employee_id=%s code=%s total=%d", employee.id, employee.employee_code, total
         )
@@ -262,7 +268,7 @@ class TrainingService:
             if self.image_repo.get_by_hash(employee_id, file_hash) is not None:
                 return False
 
-            self._persist_face(
+            vec = self._persist_face(
                 employee=employee,
                 frame_bgr=frame_bgr,
                 admin_id=None,
@@ -270,7 +276,16 @@ class TrainingService:
                 filename_hint="auto",
             )
             self.db.flush()
-            self.cache.load_from_db()
+            # H4 fix: incremental append, NOT a full DB reload. Previously
+            # this triggered a full SELECT of every embedding vector on the
+            # camera worker thread — stalling RTSP reads for hundreds of ms
+            # after every auto-enrollment.
+            self.cache.append_vectors(
+                employee_id=employee.id,
+                employee_code=employee.employee_code,
+                employee_name=employee.name,
+                new_vectors=[vec],
+            )
             log.info(
                 "Auto-enrolled emp_id=%s code=%s match=%.3f new_total=%d",
                 employee_id,
@@ -314,7 +329,13 @@ class TrainingService:
         admin_id: int | None,
         file_hash: str,
         filename_hint: str,
-    ) -> None:
+    ) -> np.ndarray:
+        """Detect, persist, return the L2-normalized embedding.
+
+        Returns the vector so callers can pass it to
+        EmbeddingCache.append_vectors() and skip the full DB reload — see
+        auto_enroll_from_frame and capture_and_enroll (H4 fix).
+        """
         env = get_settings()
         face = self.face_service.detect_single(frame_bgr)
         vec = face.embedding.astype(np.float32)
@@ -351,3 +372,4 @@ class TrainingService:
             quality_score=face.det_score,
         )
         self.embedding_repo.add(emb)
+        return vec

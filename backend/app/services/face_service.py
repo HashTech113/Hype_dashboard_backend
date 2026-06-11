@@ -23,9 +23,43 @@ class DetectedFace:
 
 
 class FaceService:
+    """Thread-safe wrapper around InsightFace FaceAnalysis.
+
+    THREAD-SAFETY CONTRACT (read before modifying this class):
+    ---------------------------------------------------------
+    The underlying ``insightface.app.FaceAnalysis`` instance is NOT thread-safe.
+    Concurrent calls into ``FaceAnalysis.get()`` (or any of its sub-models like
+    ``det_model`` / ``rec_model``) from multiple threads will corrupt internal
+    ONNX Runtime / numpy buffers and silently produce wrong embeddings or crash.
+
+    In this codebase the model is shared between:
+      * Multiple camera worker threads (one per RTSP stream)
+      * The HTTP/training thread (enrollment, embedding refresh)
+      * The preview / snapshot endpoints
+
+    To prevent the race, ALL access to the underlying model MUST go through
+    ``detect()`` / ``detect_single()``, which hold ``self._lock`` for the full
+    duration of the inference call.
+
+    DO NOT:
+      * Access ``self._app`` directly from outside this class.
+      * Add a new method that calls ``self._app.get(...)`` without
+        ``with self._lock:`` around the call.
+      * Expose ``self._app`` via a public attribute, property, or return value.
+      * Use ``_ensure_loaded()`` to obtain a handle and then run inference
+        outside the lock — ``_ensure_loaded()`` is for internal use only and
+        the returned reference must be used INSIDE ``with self._lock:``.
+
+    If you need a new inference operation, add a method here that follows the
+    same ``with self._lock: ... app.get(...) ...`` pattern used by ``detect()``.
+    """
+
+    # Name-mangled (double underscore) so external code cannot reach the model
+    # via ``service._app``. Only methods defined inside ``FaceService`` can
+    # resolve ``self.__app`` (Python rewrites it to ``_FaceService__app``).
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._app: FaceAnalysis | None = None
+        self.__app: FaceAnalysis | None = None
         self._loaded = False
 
     def load(self) -> None:
@@ -44,7 +78,7 @@ class FaceService:
             except Exception as exc:
                 log.exception("Failed to initialize InsightFace model")
                 raise FaceRecognitionError(f"Face model init failed: {exc}") from exc
-            self._app = app
+            self.__app = app
             self._loaded = True
             log.info(
                 "InsightFace '%s' loaded (provider=%s, det=%d)",
@@ -54,12 +88,20 @@ class FaceService:
             )
 
     def _ensure_loaded(self) -> FaceAnalysis:
-        if not self._loaded or self._app is None:
+        """Internal: return the underlying model handle.
+
+        WARNING: The returned ``FaceAnalysis`` is NOT thread-safe. Callers MUST
+        invoke it only while holding ``self._lock``. Do not return this handle
+        to any code outside ``FaceService``.
+        """
+        if not self._loaded or self.__app is None:
             self.load()
-        assert self._app is not None
-        return self._app
+        assert self.__app is not None
+        return self.__app
 
     def detect(self, frame_bgr: np.ndarray) -> list[DetectedFace]:
+        # NOTE: ``app.get()`` MUST run inside the lock — InsightFace is not
+        # thread-safe. See class docstring for the full contract.
         app = self._ensure_loaded()
         with self._lock:
             raw = app.get(frame_bgr)
