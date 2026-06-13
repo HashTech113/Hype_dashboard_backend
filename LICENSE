@@ -1,0 +1,92 @@
+Source-Available Portfolio License
+
+Copyright (c) 2026 HashTech113
+
+All rights reserved.
+
+This software and its source code (the "Work") are made publicly viewable on
+GitHub as part of the author's portfolio for evaluation and educational
+purposes only. By accessing, downloading, viewing, or executing the Work, you
+agree to the following terms.
+
+1. PERMITTED USES
+
+   You may, without prior written permission of the author:
+
+   (a) View and read the source code of the Work via GitHub or any other
+       location to which the author has published it;
+
+   (b) Clone or download the Work to a personal device for the purpose of
+       evaluating the author's engineering skill, reading the source code,
+       or running the Work locally for personal, non-commercial evaluation;
+
+   (c) Quote short excerpts of the Work (under 50 lines) in technical
+       writing, code reviews, or educational material, provided the author
+       and the URL of this repository are credited.
+
+2. PROHIBITED USES
+
+   Without prior written permission of the author, you may NOT:
+
+   (a) Redistribute the Work, in whole or in substantial part, whether
+       modified or unmodified, in source or binary form;
+
+   (b) Use the Work, in whole or in part, in any product or service that is
+       sold, licensed, or otherwise made available for commercial gain;
+
+   (c) Create or distribute a derivative work whose purpose substantially
+       overlaps with the Work (face-recognition CCTV / attendance systems
+       sold to third parties);
+
+   (d) Remove, alter, or obscure any copyright, license, attribution, or
+       provenance notices contained in the Work;
+
+   (e) Use the author's name, GitHub handle, or any trade names to endorse
+       or promote products derived from the Work without prior written
+       permission.
+
+3. CONTRIBUTIONS
+
+   The author does not currently accept pull requests, issues, or other
+   contributions to this repository. Any communication submitted as a pull
+   request, issue, or commit message may be used by the author without
+   restriction or compensation.
+
+4. NO WARRANTY
+
+   THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT
+   SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT
+   OF, OR IN CONNECTION WITH THE WORK OR THE USE OR OTHER DEALINGS IN THE
+   WORK.
+
+5. THIRD-PARTY COMPONENTS
+
+   This Work depends on, but does not include the source code of, several
+   third-party open-source libraries and tools (FastAPI, Next.js,
+   InsightFace, OpenCV, PostgreSQL, NSSM, go2rtc, and others). Those
+   components remain under their respective licenses and are governed by
+   their own terms when distributed separately from this Work.
+
+6. PERMISSION REQUESTS
+
+   To request permission for any use not granted by this license — including
+   forking for the purpose of a derivative product, commercial deployment,
+   academic publication, or inclusion in a teaching curriculum — open a
+   GitHub Discussion in this repository or contact the author directly via
+   the email address on the author's GitHub profile.
+
+7. TERMINATION
+
+   Your rights under Section 1 (Permitted Uses) terminate automatically
+   upon any breach of Section 2 (Prohibited Uses). Upon termination you
+   must delete all copies of the Work in your possession or control.
+
+8. GOVERNING LAW
+
+   This license shall be governed by and construed in accordance with the
+   laws of India, without regard to its conflict-of-laws principles. Any
+   dispute arising under this license shall be subject to the exclusive
+   jurisdiction of the courts of Tamil Nadu, India.

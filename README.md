@@ -190,9 +190,11 @@ build.cmd
 
 ## Documentation
 
+- [`ENGINEERING_POSTMORTEM.md`](./ENGINEERING_POSTMORTEM.md) — **the realtime live preview journey: cutting RTSP lag from 5 s to ~100 ms across four architectural iterations.** The hardest engineering problem in the project, written up as a postmortem with numbers and code snippets.
 - [`deploy/PRODUCTION_GUARANTEES.md`](./deploy/PRODUCTION_GUARANTEES.md) — what's bundled, what's auto-handled, failure modes
 - [`deploy/installer/README.md`](./deploy/installer/README.md) — Setup.exe build procedure
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md) — full operator runbook
+- [`PRODUCTION_AUDIT_PUNCHLIST.md`](./PRODUCTION_AUDIT_PUNCHLIST.md) — 135 verified audit findings, severity-categorised
 - [`backend/README.md`](./backend/README.md) — backend design + service responsibilities
 - [`frontend/README.md`](./frontend/README.md) — frontend architecture + dashboard layout
 
@@ -202,4 +204,4 @@ Built as a single-developer project over several iterations. Currently productio
 
 ## License
 
-Personal portfolio project. Not for redistribution without permission.
+Source-Available Portfolio License — see [`LICENSE`](./LICENSE). The code is publicly viewable for evaluation and educational purposes; redistribution, commercial use, and derivative products require written permission.
